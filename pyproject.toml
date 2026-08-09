@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scalabel"
+version = "0.0.1"
+description = "Fast tile-wise connected-components labeling of large N-D arrays, returning a lazy dask array"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [ { name = "Bugra Özdemir", email = "bugraa.ozdemir@gmail.com" } ]
+keywords = ["connected-components", "labeling", "dask", "ndimage", "chunked", "out-of-core"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "dask",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

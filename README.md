@@ -1,9 +1,9 @@
-# ScaLabel
+# Tilabel
 
 Fast tile-wise **connected-components labeling** for large N-dimensional arrays,
 returning a lazy `dask.array.Array` of labels.
 
-`scalabel.label_array` takes any large N-D binary mask (NumPy, Zarr, or Dask
+`tilabel.label_array` takes any large N-D binary mask (NumPy, Zarr, or Dask
 backed) and returns a **lazy dask array** of connected-component labels, computed
 with a tile-local labeling pass plus a small global boundary-piece graph. It is:
 
@@ -26,7 +26,7 @@ Labels are **dense integers `1..N`** (background `0`), `int32` when `N < 2**31`
 ## Installation
 
 ```bash
-pip install scalabel
+pip install tilabel
 # or, from a checkout:
 pip install -e .
 ```
@@ -42,7 +42,7 @@ your data first, then label:
 
 ```python
 import numpy as np
-from scalabel import label_array
+from tilabel import label_array
 
 # any N-D array; truthy = foreground
 image = np.random.default_rng(0).integers(0, 100, size=(512, 512), dtype=np.uint8)
@@ -66,7 +66,7 @@ write the result.
 
 ```python
 import dask.array as da
-from scalabel import label_array
+from tilabel import label_array
 
 # read one array directly from a zarr store (no OME-Zarr machinery needed)
 arr = da.from_zarr("dataset.zarr/0")     # e.g. a huge 3D volume, uint8/uint16
@@ -193,7 +193,7 @@ Peak memory is roughly `n_workers × (tile voxels) × (a few bytes)`. Set
 
 ## How it works: interior–boundary reconciliation
 
-`scalabel` is a **tile-wise** connected-components labeler: label each tile on its
+`tilabel` is a **tile-wise** connected-components labeler: label each tile on its
 own, then merge the components that meet across tile borders. It adapts that
 classic idea with two moves that keep it fast and memory-bounded:
 
@@ -267,7 +267,7 @@ under a second.
 
 ## Also available
 
-- `scalabel.label_array_legacy(mask, output_labels, ...)`: an earlier *eager*
+- `tilabel.label_array_legacy(mask, output_labels, ...)`: an earlier *eager*
   implementation that writes into a pre-allocated output buffer (NumPy/Zarr)
   instead of returning a lazy array. Kept for comparison/benchmarking; prefer
   `label_array` for new code.

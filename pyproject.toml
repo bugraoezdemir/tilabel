@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "scalabel"
+name = "tilabel"
 version = "0.0.1"
 description = "Fast tile-wise connected-components labeling of large N-D arrays, returning a lazy dask array"
 readme = "README.md"

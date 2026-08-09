@@ -22,7 +22,7 @@ N-D binary mask, via a two-phase approach:
 
 This is the primary API. For the earlier eager implementation (pre-allocated
 output buffer, write-then-read-modify-write Pass 1/Pass 2), see
-`scalabel.legacy`.
+`tilabel.legacy`.
 """
 
 from __future__ import annotations

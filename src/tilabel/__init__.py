@@ -1,4 +1,4 @@
-"""scalabel: fast tile-wise connected-components labeling for large N-D arrays.
+"""tilabel: fast tile-wise connected-components labeling for large N-D arrays.
 
 `label_array` returns a lazy `dask.array.Array` of connected-component labels
 for any large N-D binary mask (numpy / zarr / dask input), computed via a
@@ -10,7 +10,7 @@ downstream dask operations.
 pre-allocated output buffer); kept for comparison/benchmarking.
 """
 
-from scalabel.core import label_array
-from scalabel.legacy import label_array_legacy
+from tilabel.core import label_array
+from tilabel.legacy import label_array_legacy
 
 __all__ = ["label_array", "label_array_legacy"]

@@ -1,6 +1,6 @@
 """Eager tile-wise connected-components labeling into a pre-allocated output.
 
-LEGACY: superseded by `scalabel.label_array`, which produces an equivalent
+LEGACY: superseded by `tilabel.label_array`, which produces an equivalent
 (exact-match) lazy `dask.array.Array` directly - no pre-allocated output
 buffer and no Pass 2 read-modify-write - and is ~2.5-3.5x faster end-to-end.
 Kept for comparison/benchmarking.
@@ -30,7 +30,7 @@ from typing import Dict, Optional, Sequence, Tuple
 import numpy as np
 import scipy.ndimage as ndi
 
-from scalabel.core import (
+from tilabel.core import (
     Piece,
     Tile,
     _boundary_slab,
@@ -154,7 +154,7 @@ def label_array_legacy(
 ) -> dict:
     """Label connected components of a binary N-D mask into `output_labels`.
 
-    LEGACY: prefer `scalabel.label_array` (returns a lazy `dask.array.Array`
+    LEGACY: prefer `tilabel.label_array` (returns a lazy `dask.array.Array`
     instead of writing into a pre-allocated buffer, with the same object
     identities and ~2.5-3.5x faster end-to-end). This implementation is kept
     for comparison/benchmarking.

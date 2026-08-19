@@ -633,6 +633,18 @@ def _relabel_region(block, location, luts, tile_shape, shape, struct, connectivi
     ndim = len(shape)
     starts = [lo for lo, _ in location]
     stops = [hi for _, hi in location]
+    # This func can only reproduce Phase A's local ids if it is handed WHOLE tiles - it
+    # re-runs the per-tile labeling to rebuild them. A partial tile relabels a different
+    # region, so the local ids no longer index that tile's LUT: previously that surfaced as
+    # a bare IndexError from the LUT lookup, or (worse) silently wrong labels. The pull side
+    # guarantees this via map_overlap(align=tile_shape); assert it rather than trust it.
+    for a in range(ndim):
+        if starts[a] % tile_shape[a] or (stops[a] % tile_shape[a] and stops[a] != shape[a]):
+            raise ValueError(
+                f"tilewise-ccl Phase B needs whole tiles, got region {tuple(location)} "
+                f"against tile_shape {tuple(tile_shape)} on axis {a}. This means the read "
+                f"was not aligned to the tile grid (map_overlap align=)."
+            )
     out = np.zeros(block.shape, dtype=out_dtype)
     tlo = [starts[a] // tile_shape[a] for a in range(ndim)]
     thi = [(stops[a] - 1) // tile_shape[a] for a in range(ndim)]

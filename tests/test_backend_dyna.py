@@ -169,3 +169,46 @@ def test_2d_volume(tmp_path):
     labels = label_array(io.read(path) > 128, tile_shape=(16, 16),
                          connectivity=2, n_workers=2)
     assert _partition(_materialize(labels)) == _partition(expected)
+
+
+@pytest.mark.parametrize("connectivity", [1, 2, 3])
+def test_integer_index_plane(tmp_path, blobs, connectivity):
+    """`labels[z]` must equal row z of the fully materialized array.
+
+    Phase B rebuilds each tile's local ids by re-labeling the tile, so it needs WHOLE tiles.
+    An integer index used to bypass the pull side's alignment and hand it a 1-voxel slab,
+    which raised `IndexError: index N is out of bounds` from the LUT lookup - or, for
+    smaller volumes, silently returned wrong labels. This is what makes a lazy slice viewer
+    possible: one plane out of the labels without materializing the volume.
+    """
+    path = _write(tmp_path, blobs, (16, 16, 16))
+    labels = label_array(io.read(path) > 128, tile_shape=(16, 16, 16),
+                         connectivity=connectivity, n_workers=2)
+    full = _materialize(labels)
+    # tile boundaries, interiors, both ends, and a negative index
+    for z in (0, 1, 15, 16, 17, 32, 63, -1, -17):
+        np.testing.assert_array_equal(_materialize(labels[z]), full[z],
+                                      err_msg=f"z={z}, connectivity={connectivity}")
+
+
+def test_integer_index_other_axes(tmp_path, blobs):
+    """Integer indexing on a trailing axis, and on several axes at once."""
+    path = _write(tmp_path, blobs, (16, 16, 16))
+    labels = label_array(io.read(path) > 128, tile_shape=(16, 16, 16),
+                         connectivity=2, n_workers=2)
+    full = _materialize(labels)
+    for key in [(slice(None), 20, slice(None)),
+                (slice(None), slice(None), 33),
+                (20, 33, slice(None)),
+                (10, 20, 30)]:
+        np.testing.assert_array_equal(_materialize(labels[key]), full[key],
+                                      err_msg=f"key={key}")
+
+
+def test_windowed_plane(tmp_path, blobs):
+    """A sub-window of a plane - the viewer's frame-size knob - stays correct."""
+    path = _write(tmp_path, blobs, (16, 16, 16))
+    labels = label_array(io.read(path) > 128, tile_shape=(16, 16, 16),
+                         connectivity=2, n_workers=2)
+    full = _materialize(labels)
+    np.testing.assert_array_equal(_materialize(labels[32, 8:56, 8:56]), full[32, 8:56, 8:56])

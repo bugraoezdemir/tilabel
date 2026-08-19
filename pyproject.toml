@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tilewise-ccl"
-version = "0.0.2"
+version = "0.0.3"
 description = "Fast tile-wise connected-components labeling of large N-D arrays, returning a lazy dask array"
 readme = "README.md"
 # 3.11+ to match dyna-zarr, which the `backend="dyna"` path depends on.

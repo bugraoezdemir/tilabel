@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tilewise-ccl"
-version = "0.0.3"
+version = "0.0.4"
 description = "Fast tile-wise connected-components labeling of large N-D arrays, returning a lazy dask array"
 readme = "README.md"
 # 3.11+ to match dyna-zarr, which the `backend="dyna"` path depends on.
@@ -47,11 +47,14 @@ dependencies = [
 # light and only fails when you actually reach for one of these.
 [project.optional-dependencies]
 # `backend="dyna"`: memory-bounded pull-model tile reads + a dask-free Phase B.
-dyna = ["dyna-zarr>=0.0.5"]
+# >=0.0.6 is REQUIRED, not merely preferred: Phase B needs whole tiles, and only 0.0.6
+# aligns an INTEGER-indexed axis to the map_overlap grid. Against 0.0.5, `labels[z]`
+# hands Phase B a 1-voxel slab and it raises "needs whole tiles".
+dyna = ["dyna-zarr>=0.0.6"]
 # `labeler="cc3d"`: a ~2x faster per-tile CCL kernel (3-D only, holds the GIL, so it only
 # pays off with executor="process").
 cc3d = ["connected-components-3d"]
-all = ["dyna-zarr>=0.0.5", "connected-components-3d"]
+all = ["dyna-zarr>=0.0.6", "connected-components-3d"]
 dev = [
     "pytest>=7.0",
     # the legacy tests write into a zarr output buffer

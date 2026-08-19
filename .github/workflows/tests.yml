@@ -74,6 +74,35 @@ jobs:
         run: python -m pytest tests/ -v -o addopts=""
 
 
+  install-check:
+    # Builds the wheel, installs it into a CLEAN venv from OUTSIDE the repo, and runs the
+    # suite against the RESOLVED PyPI dependencies. The jobs above use `-e .`, so a wrong
+    # version pin is invisible there: tilewise-ccl 0.0.3 shipped pinning dyna-zarr>=0.0.5,
+    # whose map_overlap does not align an integer-indexed axis, and five dyna tests failed
+    # on a fresh install while the source tree stayed green. `twine check` does not catch
+    # this either - it validates metadata, not resolution.
+    name: Wheel installs and tests pass on resolved deps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Build, install into a clean venv, run the suite
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/python -m pip install --upgrade pip
+          /tmp/fresh/bin/python -m pip install "$(ls dist/*.whl)[dev,all]" pytest
+          # copy the tests out: running from the repo root would put ./src back on
+          # sys.path and defeat the point of installing the wheel
+          cp -r tests /tmp/wheel_tests
+          cd /tmp && /tmp/fresh/bin/python -m pytest /tmp/wheel_tests -v -o addopts=""
+
   lint:
     name: Package metadata
     runs-on: ubuntu-latest

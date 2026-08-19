@@ -1,4 +1,4 @@
-"""Correctness tests for the primary API tilabel.label_array.
+"""Correctness tests for the primary API tilewise_ccl.label_array.
 
 `label_array` returns a lazy `dask.array.Array`. For each case we compute it
 and assert an exact label-to-label bijection against a direct
@@ -12,7 +12,7 @@ N-D generality.
 import numpy as np
 import scipy.ndimage as ndi
 
-from tilabel import label_array
+from tilewise_ccl import label_array
 
 
 def _check_bijection(ref: np.ndarray, mine: np.ndarray, n_ref: int, diag: dict) -> None:

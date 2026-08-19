@@ -1,0 +1,95 @@
+name: Tests
+
+# Runs the test suite on every push and pull request to the main branches, and
+# can be kicked off by hand from the Actions tab.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  # A new push to the same branch cancels an in-flight run for it.
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (py${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every Python the package claims support for, on Linux.
+        os: [ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          # One Windows and one macOS run: this package is developed on Windows,
+          # and the tile/chunk paths have hit platform-specific issues before.
+          - os: windows-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.13"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        # [dev] brings pytest and zarr (the legacy tests write into a zarr buffer).
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run tests
+        # -o addopts="": the repo's pytest config may set coverage flags that are
+        # not installed here; the workflow decides what to run.
+        run: python -m pytest tests/ -v -o addopts=""
+
+  test-extras:
+    # With the extras installed, tests/test_backend_dyna.py stops skipping and the
+    # dask-free path is covered too. Kept as a separate job because these pull heavier
+    # deps (dyna-zarr -> tensorstore) that must not be able to break the core matrix.
+    name: pytest with optional backends
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install with all extras
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,all]"
+
+      - name: Run tests
+        run: python -m pytest tests/ -v -o addopts=""
+
+
+  lint:
+    name: Package metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Build and check the distribution
+        # Catches metadata that would be rejected at publish time - the same
+        # check the release workflow runs, but on every push rather than at the
+        # point where a bad version is already tagged.
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          python -m twine check dist/*

@@ -1,4 +1,4 @@
-"""Synthetic correctness tests for tilabel.legacy.label_array_legacy.
+"""Synthetic correctness tests for tilewise_ccl.legacy.label_array_legacy.
 
 Mask and output are backed by real on-disk zarr arrays (not plain numpy or
 in-memory stores), since the read-modify-write path in `apply_tile` (Pass 2)
@@ -13,7 +13,7 @@ import numpy as np
 import scipy.ndimage as ndi
 import zarr
 
-from tilabel.legacy import label_array_legacy
+from tilewise_ccl.legacy import label_array_legacy
 
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 INPUTS_DIR = PACKAGE_ROOT / "_fixtures" / "inputs"

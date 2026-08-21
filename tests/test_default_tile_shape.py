@@ -80,3 +80,27 @@ def test_default_labels_correctly():
 
     got = np.asarray(label_array(vol, connectivity=2, n_workers=2))
     assert part(got) == part(expected)
+
+
+def test_accepts_dask_style_chunks():
+    """A dask array reports `.chunks` as a tuple-of-tuples, zarr as flat ints.
+
+    `int(c)` on the tuple raised `TypeError: int() argument must be ... not 'tuple'`
+    for every dask-backed input to `label_array`.
+    """
+    flat = default_tile_shape((1, 1, 256, 256, 256), (1, 1, 64, 64, 64))
+    nested = default_tile_shape(
+        (1, 1, 256, 256, 256),
+        ((1,), (1,), (64, 64, 64, 64), (64, 64, 64, 64), (64, 64, 64, 64)),
+    )
+    assert nested == flat
+
+
+def test_ragged_last_chunk_uses_the_regular_size():
+    """The trailing block is short; the tile must key off the regular block size."""
+    got = default_tile_shape(
+        (1, 1, 200, 200, 200),
+        ((1,), (1,), (64, 64, 64, 8), (64, 64, 64, 8), (64, 64, 64, 8)),
+    )
+    assert all(g > 0 for g in got)
+    assert got == default_tile_shape((1, 1, 200, 200, 200), (1, 1, 64, 64, 64))

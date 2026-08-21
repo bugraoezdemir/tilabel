@@ -422,10 +422,3 @@ Process pools fall back to threads automatically for an in-memory NumPy mask
 so pair it with `executor="process"` or not at all.
 
 ---
-
-## Also available
-
-- `tilewise_ccl.label_array_legacy(mask, output_labels, ...)`: an earlier *eager*
-  implementation that writes into a pre-allocated output buffer (NumPy/Zarr)
-  instead of returning a lazy array. Kept for comparison/benchmarking; prefer
-  `label_array` for new code.

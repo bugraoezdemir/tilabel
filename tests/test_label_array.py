@@ -3,7 +3,7 @@
 `label_array` returns a lazy `dask.array.Array`. For each case we compute it
 and assert an exact label-to-label bijection against a direct
 `scipy.ndimage.label` reference on the same (tile-free) array - the same
-strict check used for the legacy implementation, plus a check that the
+strict ground-truth check, plus a check that the
 diagnostic object count matches. Both the sequential (n_workers=1) and
 threaded (n_workers>1) Phase-A paths are exercised, and 2D + 3D to confirm the
 N-D generality.

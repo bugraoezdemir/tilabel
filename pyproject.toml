@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tilewise-ccl"
-version = "0.0.4"
+version = "0.0.5"
 description = "Fast tile-wise connected-components labeling of large N-D arrays, returning a lazy dask array"
 readme = "README.md"
 # 3.11+ to match dyna-zarr, which the `backend="dyna"` path depends on.
@@ -57,7 +57,7 @@ cc3d = ["connected-components-3d"]
 all = ["dyna-zarr>=0.0.6", "connected-components-3d"]
 dev = [
     "pytest>=7.0",
-    # the legacy tests write into a zarr output buffer
+    # the correctness tests build zarr-backed masks
     "zarr>=3.0.0",
 ]
 

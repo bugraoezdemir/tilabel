@@ -29,9 +29,9 @@ cost of reading/labelling a larger block, `map_overlap`'s cross-block machinery,
 and having to discard "halo-only" components. Verified identical to a whole-array
 `scipy.ndimage.label` for connectivity 1/2/3.
 
-This is the primary API. For the earlier eager implementation (pre-allocated
-output buffer, write-then-read-modify-write Pass 1/Pass 2), see
-`tilewise_ccl.legacy`.
+This is the only API. An earlier eager implementation (`label_array_legacy`, a
+pre-allocated output buffer with a write-then-read-modify-write Pass 1/Pass 2) was
+removed in 0.0.5; it was kept only for benchmarking and had no users.
 """
 
 from __future__ import annotations
@@ -132,7 +132,11 @@ def default_tile_shape(shape: Sequence[int], chunks=None,
     budget = max(1, int(target_mib * 1024 * 1024) // 4)      # voxels, at int32 labels
 
     if chunks is not None and len(chunks) == ndim:
-        step = [max(1, int(c)) for c in chunks]
+        # A dask array reports `.chunks` as a tuple-of-tuples (per-axis block sizes),
+        # while zarr reports flat ints. Normalise: take the FIRST block of each axis,
+        # which is the regular size every block but a ragged last one has. Passing the
+        # tuple straight to int() raised TypeError on every dask-backed input.
+        step = [max(1, int(c[0] if isinstance(c, (tuple, list)) else c)) for c in chunks]
     else:
         step = [1] * ndim
 
@@ -395,7 +399,7 @@ class EdgeList:
     graph algorithm itself.
 
     Still supports ``len()`` and iteration yielding ``((tile_idx, lid), (tile_idx, lid))``
-    so the legacy eager path (`tilewise_ccl.legacy`) keeps working unchanged.
+    for callers that want to inspect the boundary graph directly.
     """
 
     __slots__ = ("a", "b", "grid_shape", "stride")
@@ -438,9 +442,8 @@ def build_edges(
     connectivity 1/2/3), so holding them all until the function returns pins the full
     Phase-A slab set for no reason - 7.4 GiB at a 9^3 grid of 672^3 tiles, in the parent
     process, concurrently with Phase B's write buffers. Releasing as we go keeps only the
-    live frontier. Pass `release=False` to keep `tile_results_by_idx` intact (the legacy
-    eager path re-reads nothing, but callers inspecting `boundaries` afterwards would
-    otherwise find them gone).
+    live frontier. Pass `release=False` to keep `tile_results_by_idx` intact, for a
+    caller that wants to inspect the per-tile `boundaries` afterwards.
     """
     ndim = len(grid_shape)
     directions = [off for off in neighbor_offsets(ndim, connectivity) if _is_canonical(off)]
@@ -519,73 +522,43 @@ def reconcile(
 ) -> Tuple[Dict[Piece, int], int]:
     """Union-find over boundary pieces -> {(tile_idx, local_id): final_id}.
 
-    Runs over PACKED int64 piece ids when handed an `EdgeList` (the fast path): hashing a
-    plain int is far cheaper than hashing a nested `((i,j,k), lid)` tuple, and the packed
-    form is what `build_edges` already produces. A plain list of tuple pairs (the legacy
-    eager path) is still accepted and handled exactly as before. The returned `lut` is a
-    dict keyed by the tuple pieces either way, so callers are unaffected.
+    Runs over PACKED int64 piece ids: hashing a plain int is far cheaper than hashing a
+    nested `((i,j,k), lid)` tuple, and the packed form is what `build_edges` produces. The
+    returned `lut` is keyed by the tuple pieces, so callers are unaffected.
     """
-    if isinstance(edges, EdgeList):
-        stride = edges.stride
-        grid_shape = edges.grid_shape
-        strides_c = tuple(int(x) for x in np.cumprod((1,) + tuple(grid_shape)[:0:-1])[::-1])
+    stride = edges.stride
+    grid_shape = edges.grid_shape
+    strides_c = tuple(int(x) for x in np.cumprod((1,) + tuple(grid_shape)[:0:-1])[::-1])
 
-        uf = UnionFind()
-        for a, b in zip(edges.a.tolist(), edges.b.tolist()):
-            uf.union(a, b)
-
-        # Every boundary piece, packed the same way build_edges packed them.
-        packed_pieces: List[int] = []
-        piece_tuples: List[Piece] = []
-        for result in tile_results:
-            # `touching_ids` is an ndarray on the core path but a set in tilewise_ccl.legacy -
-            # accept either, since legacy shares build_edges/reconcile with this module.
-            touching = result["touching_ids"]
-            ids = (sorted(int(v) for v in touching)
-                   if isinstance(touching, (set, frozenset))
-                   else np.asarray(touching).tolist())
-            if not ids:
-                continue
-            tile_idx = result["tile_idx"]
-            base = sum(int(t) * sc for t, sc in zip(tile_idx, strides_c)) * stride
-            for lid in ids:
-                packed_pieces.append(base + lid)
-                piece_tuples.append((tile_idx, lid))
-
-        groups: Dict[int, List[int]] = defaultdict(list)
-        for i, packed in enumerate(packed_pieces):
-            groups[uf.find(packed)].append(i)
-
-        lut: Dict[Piece, int] = {}
-        next_id = n_tiles * big_offset + 1  # disjoint from every tile's interior-id range
-        for members in groups.values():
-            for i in members:
-                lut[piece_tuples[i]] = next_id
-            next_id += 1
-        return lut, len(groups)
-
-    # --- legacy path: a plain sequence of ((tile, lid), (tile, lid)) pairs ---
     uf = UnionFind()
-    for a, b in edges:
+    for a, b in zip(edges.a.tolist(), edges.b.tolist()):
         uf.union(a, b)
 
-    all_pieces: set = set()
+    # Every boundary piece, packed the same way build_edges packed them.
+    packed_pieces: List[int] = []
+    piece_tuples: List[Piece] = []
     for result in tile_results:
-        for lid in result["touching_ids"]:
-            all_pieces.add((result["tile_idx"], int(lid)))   # int(): touching_ids is an ndarray
+        ids = np.asarray(result["touching_ids"]).tolist()
+        if not ids:
+            continue
+        tile_idx = result["tile_idx"]
+        base = sum(int(t) * sc for t, sc in zip(tile_idx, strides_c)) * stride
+        for lid in ids:
+            packed_pieces.append(base + lid)
+            piece_tuples.append((tile_idx, lid))
 
-    groups_t: Dict[Piece, List[Piece]] = defaultdict(list)
-    for piece in all_pieces:
-        groups_t[uf.find(piece)].append(piece)
+    groups: Dict[int, List[int]] = defaultdict(list)
+    for i, packed in enumerate(packed_pieces):
+        groups[uf.find(packed)].append(i)
 
-    lut = {}
+    lut: Dict[Piece, int] = {}
     next_id = n_tiles * big_offset + 1  # disjoint from every tile's interior-id range
-    for pieces in groups_t.values():
-        for piece in pieces:
-            lut[piece] = next_id
+    for members in groups.values():
+        for i in members:
+            lut[piece_tuples[i]] = next_id
         next_id += 1
+    return lut, len(groups)
 
-    return lut, len(groups_t)
 
 
 # --- Phase A worker plumbing -------------------------------------------------------------
@@ -914,8 +887,8 @@ def label_array(
         print(f"Reconciliation: {len(edges)} edges -> {n_groups} boundary groups")
 
     # --- Assign DENSE final ids (1..N) and build a FULL per-tile LUT.
-    # `reconcile` returns SPARSE boundary-group ids (a disjoint high range,
-    # shared with the legacy path's collision-free scheme); we remap them here
+    # `reconcile` returns SPARSE boundary-group ids (a disjoint high range that
+    # cannot collide with any tile's interior ids); we remap them here
     # to a dense 1..n_groups range and give interior pieces the ids
     # n_groups+1..N. This is a metadata-only loop over PIECES (not voxels), so
     # producing dense ids costs nothing extra - no compaction pass over the
